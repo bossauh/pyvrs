@@ -180,8 +180,8 @@ class VRS:
             self.preprocessing_chain \
             = quick_kwargs(
                 ("wakeword_sensitivity", 0.5),
-                "logging",
-                "output_track",
+                ("logging", None),
+                ("output_track", None),
                 ("disable_vosk", False),
                 ("speech_lengths", (6.0, 0.9)),
                 ("offline", False),
