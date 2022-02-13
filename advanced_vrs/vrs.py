@@ -306,13 +306,14 @@ class VRS:
             self.logging.success(
                 "VRS Started successfully.", group=LOGGING_GROUP)
 
-    async def stop(self) -> None:
+    async def stop(self, blocking: bool = True) -> None:
         if self.logging:
             self.logging.debug("Stopping the VRS...", group=LOGGING_GROUP)
         self.__stop_signal = True
 
-        while not self.stopped:
-            await asyncio.sleep(0.001)
+        if blocking:
+            while not self.stopped:
+                await asyncio.sleep(0.01)
 
         if self.logging:
             self.logging.success(
