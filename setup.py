@@ -19,13 +19,13 @@ install_requires = [
 setup(
     name="pyvrs",
     packages=["advanced_vrs"],
-    version="0.1",
+    version="0.2",
     license="MIT",
     description="A powerful voice recognition library made in python. This combines several libraries in order to achieve a 'Voice Assistant' ready library.",
     author="Philippe Mathew",
     author_email="philmattdev@gmail.com",
     url="https://github.com/bossauh/pyvrs",
-    download_url="https://github.com/bossauh/pyvrs/archive/refs/tags/v_01.tar.gz",
+    download_url="https://github.com/bossauh/pyvrs/archive/refs/tags/v_02.tar.gz",
     keywords=["voice", "speech to text", "voice recognition"],
     install_requires=install_requires
 )
