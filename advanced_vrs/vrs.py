@@ -266,6 +266,12 @@ class VRS:
                     pass
 
             time.sleep(0.0001)
+        
+        for _ in range(10):
+            try:
+                self.q.put(None, block=False)
+            except queue.Full:
+                pass
     
     def __preprocess_data(self, data: np.ndarray) -> np.ndarray:
 
