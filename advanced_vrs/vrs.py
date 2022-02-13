@@ -31,7 +31,7 @@ class Result:
     `error` :
         When an error has been caught. Original exception is written to `exception`.
     `recognized` :
-        When the phrase has been fully recognized. Text data is written to `payload`.
+        When the phrase has been fully recognized. Text data is written to `payload`. Audio data is written to `audio_data` as a ndarray.
     `unknown` :
         When the recognized phrase is unknown.
     `realtime_recognition` :
