@@ -24,8 +24,8 @@ setup(
     description="A powerful voice recognition library made in python. This combines several libraries in order to achieve a 'Voice Assistant' ready library.",
     author="Philippe Mathew",
     author_email="philmattdev@gmail.com",
-    url="",
-    download_url="",
+    url="https://github.com/bossauh/pyvrs",
+    download_url="https://github.com/bossauh/pyvrs/archive/refs/tags/v_01.tar.gz",
     keywords=["voice", "speech to text", "voice recognition"],
     install_requires=install_requires
 )
