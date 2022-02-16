@@ -391,7 +391,7 @@ class VRS:
                 self.vosk.AcceptWaveform(preprocessed.tobytes())
 
                 result = Result("recognized", json.loads(
-                    self.vosk.FinalResult()), audio_data=preprocessed)
+                    self.vosk.FinalResult())["text"], audio_data=preprocessed)
                 return await self.callback(result)
             return await self.callback(Result("error", exception=ValueError("vosk should not be disabled if offline is True")))
 
