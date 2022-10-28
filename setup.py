@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 install_requires = [
-    "tensorflow==2.6.0",
+    "tensorflow==2.10.0",
     "keras==2.6.0",
     "numpy",
     "nest_asyncio",

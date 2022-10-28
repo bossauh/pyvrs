@@ -1,22 +1,24 @@
 import asyncio
 import json
+import logging
+import queue
 import threading
 import time
 import wave
-import queue
 from dataclasses import dataclass
 from typing import Any, Callable, List, Union
 
 import numpy as np
 import pvporcupine
 import vosk
-from maglevapi.basic import quick_kwargs
 from pyaudio_mixer import InputTrack
 from pyaudio_mixer.utils import BasicFX
 from speech_recognition import AudioFile, Recognizer, UnknownValueError
 from tensorflow.keras.models import load_model
 
 from .constants import *
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -170,25 +172,13 @@ class VRS:
         self.save_path = save_path
 
         # Kwargs
-        self.wakeword_sensitivity, \
-            self.logging, \
-            self.output_track, \
-            self.disable_vosk, \
-            self.speech_lengths, \
-            self.offline, \
-            self.google_recognizer_key, \
-            self.preprocessing_chain \
-            = quick_kwargs(
-                ("wakeword_sensitivity", 0.5),
-                ("logging", None),
-                ("output_track", None),
-                ("disable_vosk", False),
-                ("speech_lengths", (6.0, 0.9)),
-                ("offline", False),
-                ("google_recognizer_key", None),
-                ("preprocessing_chain", {}),
-                kwargs=kwargs
-            )
+        self.wakeword_sensitivity = kwargs.get("wakeword_sensitivity", 0.5)
+        self.output_track = kwargs.get("output_track")
+        self.disable_vosk = kwargs.get("disable_vosk")
+        self.speech_lengths = kwargs.get("speech_lengths", (6.0, 0.9))
+        self.offline = kwargs.get("offline", False)
+        self.google_recognizer_key = kwargs.get("google_recognizer_key", None)
+        self.preprocessing_chain = kwargs.get("preprocessing_chain", {})
 
         # Initialize pvporcupine (accurate wakeword recognizer)
         self.porcupine = None
@@ -239,10 +229,8 @@ class VRS:
         try:
             return self.input_tracks[0].read()
         except AttributeError:
-
-            if self.logging:
-                self.logging.warning(
-                    "Unknown error 'AttributeError' occurred.", groups=LOGGING_GROUP)
+            logger.error(
+                "Unknown error 'AttributeError' occurred.")
 
             return
 
@@ -292,8 +280,7 @@ class VRS:
         await self._callback(*args, **kwargs, **self.callback_params)
 
     async def start(self) -> None:
-        if self.logging:
-            self.logging.debug("Starting VRS...", group=LOGGING_GROUP)
+        logger.debug("Starting VRS...")
 
         def f():
             self.loop.run_until_complete(self.__vrs__())
@@ -301,34 +288,30 @@ class VRS:
         threading.Thread(target=f, daemon=True).start()
         threading.Thread(target=self.__input_streamer__, daemon=True).start()
 
-        if self.logging:
-            self.logging.debug(
-                "Waiting for VRS to be ready...", group=LOGGING_GROUP)
+        logger.debug(
+            "Waiting for VRS to be ready...")
 
         while self.stopped:
             await asyncio.sleep(0.001)
 
-        if self.logging:
-            self.logging.success(
-                "VRS Started successfully.", group=LOGGING_GROUP)
+        logger.info(
+            "VRS Started successfully.")
 
     async def stop(self, blocking: bool = True) -> None:
-        if self.logging:
-            self.logging.debug("Stopping the VRS...", group=LOGGING_GROUP)
+        logger.debug("Stopping the VRS...")
         self.__stop_signal = True
 
         if blocking:
             while not self.stopped:
                 await asyncio.sleep(0.01)
 
-        if self.logging:
-            self.logging.success(
-                "VRS Stopped successfully", group=LOGGING_GROUP)
+        logger.info(
+            "VRS Stopped successfully")
 
     async def wait_for_wakeword(self, data: np.ndarray) -> Union[None, str]:
         wakeword_used = None
         if self.porcupine:
-            idx = self.porcupine.process(data)
+            idx = self.porcupine.process(np.frombuffer(data.tobytes(), dtype="int16"))
             if idx > -1:
                 wakeword_used = [
                     x for x in self.wakewords if x in pvporcupine.KEYWORDS][idx]
