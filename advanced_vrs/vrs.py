@@ -157,16 +157,16 @@ class VRS:
         callback: Callable,
         loop: asyncio.AbstractEventLoop,
         save_path: str,
-        **kwargs
+        **kwargs,
     ) -> None:
 
         # Required Parameters
         self.vad = vad
         self.vosk_path = vosk_path
-        self.input_tracks = input_tracks if isinstance(
-            input_tracks, list) else [input_tracks]
-        self.wakewords = wakewords if isinstance(
-            wakewords, list) else [wakewords]
+        self.input_tracks = (
+            input_tracks if isinstance(input_tracks, list) else [input_tracks]
+        )
+        self.wakewords = wakewords if isinstance(wakewords, list) else [wakewords]
         self._callback = callback
         self.loop = loop
         self.save_path = save_path
@@ -185,8 +185,7 @@ class VRS:
         if any(kw in pvporcupine.KEYWORDS for kw in self.wakewords):
             _kws = [x for x in self.wakewords if x in pvporcupine.KEYWORDS]
             self.porcupine = pvporcupine.create(
-                keywords=_kws,
-                sensitivities=[self.wakeword_sensitivity] * len(_kws)
+                keywords=_kws, sensitivities=[self.wakeword_sensitivity] * len(_kws)
             )
         self.wakewords = set(self.wakewords)
 
@@ -202,7 +201,7 @@ class VRS:
         # Initialize the list of available effects (for preprocessing)
         self.preprocessor = BasicFX(
             dtype=self.input_tracks[0].stream.dtype,
-            samplerate=self.input_tracks[0].stream.samplerate
+            samplerate=self.input_tracks[0].stream.samplerate,
         )
         if self.preprocessing_chain:
             for _e in self.preprocessing_chain.keys():
@@ -229,8 +228,7 @@ class VRS:
         try:
             return self.input_tracks[0].read()
         except AttributeError:
-            logger.error(
-                "Unknown error 'AttributeError' occurred.")
+            logger.error("Unknown error 'AttributeError' occurred.")
 
             return
 
@@ -254,13 +252,13 @@ class VRS:
                     pass
 
             time.sleep(0.0001)
-        
+
         for _ in range(10):
             try:
                 self.q.put(None, block=False)
             except queue.Full:
                 pass
-    
+
     def __preprocess_data(self, data: np.ndarray) -> np.ndarray:
 
         for effect in self.preprocessor.effects:
@@ -288,14 +286,12 @@ class VRS:
         threading.Thread(target=f, daemon=True).start()
         threading.Thread(target=self.__input_streamer__, daemon=True).start()
 
-        logger.debug(
-            "Waiting for VRS to be ready...")
+        logger.debug("Waiting for VRS to be ready...")
 
         while self.stopped:
             await asyncio.sleep(0.001)
 
-        logger.info(
-            "VRS Started successfully.")
+        logger.info("VRS Started successfully.")
 
     async def stop(self, blocking: bool = True) -> None:
         logger.debug("Stopping the VRS...")
@@ -305,16 +301,21 @@ class VRS:
             while not self.stopped:
                 await asyncio.sleep(0.01)
 
-        logger.info(
-            "VRS Stopped successfully")
+        logger.info("VRS Stopped successfully")
 
     async def wait_for_wakeword(self, data: np.ndarray) -> Union[None, str]:
+
+        self.__to_be_recognized.append(data)
+        if len(self.__to_be_recognized) > 17:
+            self.__to_be_recognized.pop(0)
+
         wakeword_used = None
         if self.porcupine:
             idx = self.porcupine.process(np.frombuffer(data.tobytes(), dtype="int16"))
             if idx > -1:
                 wakeword_used = [
-                    x for x in self.wakewords if x in pvporcupine.KEYWORDS][idx]
+                    x for x in self.wakewords if x in pvporcupine.KEYWORDS
+                ][idx]
 
         if not self.disable_vosk:
             _as_bytes = data.tobytes()
@@ -324,7 +325,9 @@ class VRS:
                 __partial = json.loads(self.vosk.PartialResult())
 
                 if __partial["partial"]:
-                    await self.callback(Result("active_listening", __partial["partial"]))
+                    await self.callback(
+                        Result("active_listening", __partial["partial"])
+                    )
 
                     if len(__partial["partial"].split()) > 25:
                         __reset = True
@@ -335,7 +338,8 @@ class VRS:
 
                 if not wakeword_used:
                     ___wakeword = [
-                        x for x in self.wakewords if x in __partial["partial"]]
+                        x for x in self.wakewords if x in __partial["partial"]
+                    ]
                     if ___wakeword:
                         wakeword_used = ___wakeword[0]
 
@@ -353,6 +357,9 @@ class VRS:
         result = Result("woke", wakeword)
         self.__woke = True
 
+        if kwargs.get("followup", False):
+            self.__to_be_recognized.clear()
+
         self.callback_params = kwargs
         await self.callback(result)
 
@@ -360,8 +367,12 @@ class VRS:
         self.__last_recognized = time.time()
 
         if not self.__to_be_recognized:
-            return await self.callback(Result("error", exception=ValueError("empty __to_be_recognized variable.")))
-        
+            return await self.callback(
+                Result(
+                    "error", exception=ValueError("empty __to_be_recognized variable.")
+                )
+            )
+
         preprocessed = self.__preprocess_data(np.concatenate(self.__to_be_recognized))
 
         # Match data types if they do not match
@@ -373,10 +384,20 @@ class VRS:
                 self.vosk.FinalResult()
                 self.vosk.AcceptWaveform(preprocessed.tobytes())
 
-                result = Result("recognized", json.loads(
-                    self.vosk.FinalResult())["text"], audio_data=preprocessed)
+                result = Result(
+                    "recognized",
+                    json.loads(self.vosk.FinalResult())["text"],
+                    audio_data=preprocessed,
+                )
                 return await self.callback(result)
-            return await self.callback(Result("error", exception=ValueError("vosk should not be disabled if offline is True")))
+            return await self.callback(
+                Result(
+                    "error",
+                    exception=ValueError(
+                        "vosk should not be disabled if offline is True"
+                    ),
+                )
+            )
 
         # Save the file and recognize it using the SpeechRecognizer library (more accurate since it uses google's)
         itrack = self.input_tracks[0]
@@ -392,12 +413,19 @@ class VRS:
             with AudioFile(self.save_path) as src:
                 audio = self.sr_recognizer.record(src)
         except Exception as e:
-            return await self.callback(Result("error", "Error trying to convert the saved file into a AudioFile object.", e))
+            return await self.callback(
+                Result(
+                    "error",
+                    "Error trying to convert the saved file into a AudioFile object.",
+                    e,
+                )
+            )
 
         # Attempt to recognize using google's recognizer
         try:
             content = self.sr_recognizer.recognize_google(
-                audio, key=self.google_recognizer_key)
+                audio, key=self.google_recognizer_key
+            )
             r = Result("recognized", content, audio_data=preprocessed)
         except UnknownValueError:
             r = Result("unknown")
@@ -420,6 +448,8 @@ class VRS:
             if self.output_track:
                 self.output_track.write(data, wait=False)
 
+            va, prob = await self.vad.detect(data)
+
             # 1: Constantly listen until a wakeword has been mentioned
             # A active_listening callback is also constantly being emitted
             if not self.__woke:
@@ -431,6 +461,7 @@ class VRS:
                 if wakeword_used:
                     await self.wake_up(wakeword_used)
                 else:
+
                     continue
 
             # 2: Wakeword has been said, record until no more voice activity.
@@ -444,7 +475,6 @@ class VRS:
 
             # 2.1: Listen for voice activities and stop "recording" once there is no more voice activity.
             # A voice_activity callback is also being emitted for every voice activity
-            va, prob = await self.vad.detect(data)
             if va:
 
                 if self.__last_va is None:
